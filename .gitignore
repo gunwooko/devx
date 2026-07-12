@@ -1,0 +1,4 @@
+/devx
+/dist/
+.coverage
+.DS_Store
