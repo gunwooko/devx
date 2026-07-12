@@ -42,6 +42,12 @@ Optional:
 - Codex CLI (`codex`)
 - Tailscale for secure remote access
 
+## Install with Homebrew
+
+```bash
+brew install gunwooko/tap/devx
+```
+
 ## Install from source
 
 Clone the repository and build:
