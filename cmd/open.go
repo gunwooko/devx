@@ -16,6 +16,7 @@ var openCmd = &cobra.Command{
 			ConfigPath:    cfgPath,
 			Name:          args[0],
 			AgentOverride: openAgent,
+			Output:        cmd.OutOrStdout(),
 		})
 	},
 }

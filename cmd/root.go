@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gunwooko/devx/internal/app"
+	"github.com/gunwooko/devx/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -32,6 +33,7 @@ Each project can use a default AI CLI such as Claude Code or Codex.`,
 		return app.OpenProject(app.OpenOptions{
 			ConfigPath: cfgPath,
 			Name:       args[0],
+			Output:     cmd.OutOrStdout(),
 		})
 	},
 }
@@ -47,5 +49,9 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "config file path (default: ~/.config/devx/config.json)")
+	defaultConfig := "<os config dir>/devx/config.json"
+	if p, err := config.Path(""); err == nil {
+		defaultConfig = p
+	}
+	rootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "config file path (default: "+defaultConfig+")")
 }

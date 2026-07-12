@@ -17,7 +17,7 @@ import (
 	"github.com/gunwooko/devx/internal/tmux"
 )
 
-var validName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+var validName = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$`)
 
 type CreateOptions struct {
 	ConfigPath string
@@ -27,6 +27,7 @@ type CreateOptions struct {
 	InitGit    bool
 	Open       bool
 	AssumeYes  bool
+	Output     io.Writer
 }
 
 type AddOptions struct {
@@ -34,12 +35,14 @@ type AddOptions struct {
 	Name       string
 	Path       string
 	Agent      string
+	Output     io.Writer
 }
 
 type OpenOptions struct {
 	ConfigPath    string
 	Name          string
 	AgentOverride string
+	Output        io.Writer
 }
 
 type ConfigureOptions struct {
@@ -51,9 +54,16 @@ type ConfigureOptions struct {
 
 func validateName(name string) error {
 	if !validName.MatchString(name) {
-		return fmt.Errorf("invalid project name %q: use letters, numbers, dots, underscores, and hyphens", name)
+		return fmt.Errorf("invalid project name %q: use letters, numbers, dots, underscores, and hyphens; start and end with a letter or number", name)
 	}
 	return nil
+}
+
+func output(w io.Writer) io.Writer {
+	if w == nil {
+		return os.Stdout
+	}
+	return w
 }
 
 func resolveAgent(requested, fallback string, interactive bool) (agent.Agent, error) {
@@ -141,10 +151,10 @@ func CreateProject(opts CreateOptions) error {
 		return err
 	}
 
-	fmt.Printf("Created %s\nPath: %s\nAgent: %s\n", opts.Name, projectPath, selected.Name)
+	fmt.Fprintf(output(opts.Output), "Created %s\nPath: %s\nAgent: %s\n", opts.Name, projectPath, selected.Name)
 
 	if opts.Open {
-		return OpenProject(OpenOptions{ConfigPath: cfgPath, Name: opts.Name})
+		return OpenProject(OpenOptions{ConfigPath: cfgPath, Name: opts.Name, Output: opts.Output})
 	}
 	return nil
 }
@@ -181,7 +191,7 @@ func AddProject(opts AddOptions) error {
 	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}
-	fmt.Printf("Added %s\nPath: %s\nAgent: %s\n", opts.Name, path, selected.Name)
+	fmt.Fprintf(output(opts.Output), "Added %s\nPath: %s\nAgent: %s\n", opts.Name, path, selected.Name)
 	return nil
 }
 
@@ -222,7 +232,7 @@ func OpenProject(opts OpenOptions) error {
 		if err := tmux.CreateDetached(session, project.Path, command); err != nil {
 			return err
 		}
-		fmt.Printf("Started %s with %s\n", opts.Name, selected.Name)
+		fmt.Fprintf(output(opts.Output), "Started %s with %s\n", opts.Name, selected.Name)
 	}
 	return tmux.AttachOrSwitch(session)
 }
@@ -259,7 +269,14 @@ func Status(configPath string, out io.Writer) error {
 	return w.Flush()
 }
 
-func StopProject(name string, out io.Writer) error {
+func StopProject(configPath, name string, out io.Writer) error {
+	cfg, _, err := config.Load(configPath)
+	if err != nil {
+		return err
+	}
+	if _, ok := cfg.Projects[name]; !ok {
+		return fmt.Errorf("project %q is not registered", name)
+	}
 	session := tmux.SessionName(name)
 	if !tmux.Exists(session) {
 		fmt.Fprintf(out, "No active session for %s\n", name)

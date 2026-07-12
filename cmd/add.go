@@ -17,6 +17,7 @@ var addCmd = &cobra.Command{
 			Name:       args[0],
 			Path:       args[1],
 			Agent:      addAgent,
+			Output:     cmd.OutOrStdout(),
 		})
 	},
 }

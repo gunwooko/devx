@@ -26,6 +26,7 @@ var createCmd = &cobra.Command{
 			InitGit:    !createNoGit,
 			Open:       !createNoOpen,
 			AssumeYes:  createYes,
+			Output:     cmd.OutOrStdout(),
 		})
 	},
 }
