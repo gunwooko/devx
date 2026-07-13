@@ -2,6 +2,8 @@
 
 `devx` is a small Go CLI for opening AI coding projects inside persistent `tmux` sessions.
 
+![devx demo](docs/demo.gif)
+
 It supports project-level defaults for:
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
