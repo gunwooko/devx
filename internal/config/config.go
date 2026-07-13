@@ -18,10 +18,18 @@ type Project struct {
 	Agent string `json:"agent"`
 }
 
+// CustomAgent declares a user-defined AI agent in the config file. Name is
+// optional and defaults to the agent id; Command is validated before use.
+type CustomAgent struct {
+	Name    string `json:"name,omitempty"`
+	Command string `json:"command"`
+}
+
 type Config struct {
-	DefaultProjectsDir string             `json:"defaultProjectsDir"`
-	DefaultAgent       string             `json:"defaultAgent"`
-	Projects           map[string]Project `json:"projects"`
+	DefaultProjectsDir string                 `json:"defaultProjectsDir"`
+	DefaultAgent       string                 `json:"defaultAgent"`
+	CustomAgents       map[string]CustomAgent `json:"customAgents,omitempty"`
+	Projects           map[string]Project     `json:"projects"`
 }
 
 func Default() (*Config, error) {

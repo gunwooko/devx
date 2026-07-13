@@ -33,7 +33,7 @@ var createCmd = &cobra.Command{
 
 func init() {
 	createCmd.Flags().StringVarP(&createPath, "path", "p", "", "project path (default: <defaultProjectsDir>/<name>)")
-	createCmd.Flags().StringVarP(&createAgent, "agent", "a", "", "AI agent: claude, codex, gemini, or none")
+	createCmd.Flags().StringVarP(&createAgent, "agent", "a", "", "AI agent: claude, codex, gemini, opencode, none, or a custom agent")
 	createCmd.Flags().BoolVar(&createNoGit, "no-git", false, "do not initialize a Git repository")
 	createCmd.Flags().BoolVar(&createNoOpen, "no-open", false, "create without opening the project")
 	createCmd.Flags().BoolVarP(&createYes, "yes", "y", false, "accept defaults without prompting")

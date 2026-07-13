@@ -7,7 +7,9 @@ It supports project-level defaults for:
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - [Codex CLI](https://github.com/openai/codex)
 - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+- [OpenCode](https://github.com/sst/opencode)
 - Shell-only sessions
+- Any other AI CLI, declared as a [custom agent](#custom-agents)
 
 The main workflow is:
 
@@ -22,7 +24,7 @@ When a project is opened, `devx` creates or reconnects to a tmux session. That m
 
 - Create and Git-initialize new projects
 - Register existing projects, one at a time or in bulk with `devx import`
-- Choose Claude Code, Codex, Gemini, or shell-only per project
+- Choose Claude Code, Codex, Gemini, OpenCode, shell-only, or a custom agent per project
 - Override the AI agent for a new session
 - Create, attach, switch, inspect, and stop tmux sessions
 - Fuzzy project name matching on open (`devx nls` finds `novel-love-story`)
@@ -51,6 +53,7 @@ Optional:
 - Claude Code (`claude`)
 - Codex CLI (`codex`)
 - Gemini CLI (`gemini`)
+- OpenCode (`opencode`)
 - Tailscale for secure remote access
 
 ## Install with Homebrew
@@ -154,7 +157,7 @@ devx open novel
 | `devx list` | List registered projects (name, agent, path) |
 | `devx status` | Like `list`, plus whether each session is running or stopped |
 | `devx stop <name>` | Kill the project's tmux session; the project stays registered |
-| `devx agent <name> <claude\|codex\|gemini\|none>` | Change the project's default agent |
+| `devx agent <name> <agent>` | Change the project's default agent (built-in or custom) |
 | `devx remove <name>` | Unregister a project; files are never deleted |
 | `devx config` | Show or update global defaults |
 | `devx doctor` | Check dependencies and configuration |
@@ -234,6 +237,23 @@ Use a custom configuration file:
 devx --config /path/to/config.json list
 ```
 
+### Custom agents
+
+Built-in agents are `claude`, `codex`, `gemini`, `opencode`, and `none`. Any other AI CLI can be declared under `customAgents` in the config file — no devx release required:
+
+```json
+{
+  "customAgents": {
+    "aider": {
+      "name": "Aider",
+      "command": "aider --model gpt-4o"
+    }
+  }
+}
+```
+
+The key is the agent id used everywhere an agent can be named (`devx create --agent aider`, `devx agent novel aider`, `defaultAgent`). `name` is an optional display name. `command` must be a plain executable with simple arguments; shell operators such as `;`, `|`, `$()`, and quotes are rejected, and a custom id cannot shadow a built-in agent. `devx doctor` reports whether each custom agent's command is valid and installed.
+
 ## Remote workflow
 
 On the Mac:
@@ -270,11 +290,10 @@ go build ./...
 - `devx` does not manage SSH keys, VPNs, or Tailscale ACLs.
 - The config file is written with user-only permissions where supported.
 - Project files are never deleted by `devx remove`.
-- Agent commands are selected from a fixed allowlist rather than arbitrary shell input.
+- Built-in agent commands come from a fixed allowlist. Custom agents are defined only in your own config file, and their commands are validated to reject shell operators before reaching tmux.
 
 ## Roadmap
 
-- More agents such as OpenCode
 - Optional TUI project picker
 
 ## License

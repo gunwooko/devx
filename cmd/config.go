@@ -26,6 +26,6 @@ var configCmd = &cobra.Command{
 
 func init() {
 	configCmd.Flags().StringVar(&configDefaultDir, "default-dir", "", "default directory for newly created projects")
-	configCmd.Flags().StringVar(&configDefaultAgent, "default-agent", "", "default agent: claude, codex, gemini, or none")
+	configCmd.Flags().StringVar(&configDefaultAgent, "default-agent", "", "default agent: claude, codex, gemini, opencode, none, or a custom agent")
 	rootCmd.AddCommand(configCmd)
 }

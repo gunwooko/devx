@@ -26,7 +26,7 @@ var importCmd = &cobra.Command{
 }
 
 func init() {
-	importCmd.Flags().StringVarP(&importAgent, "agent", "a", "", "AI agent for imported projects: claude, codex, gemini, or none")
+	importCmd.Flags().StringVarP(&importAgent, "agent", "a", "", "AI agent for imported projects: claude, codex, gemini, opencode, none, or a custom agent")
 	importCmd.Flags().BoolVarP(&importDryRun, "dry-run", "n", false, "show what would be imported without saving")
 	rootCmd.AddCommand(importCmd)
 }

@@ -75,27 +75,51 @@ func output(w io.Writer) io.Writer {
 	return w
 }
 
-func resolveAgent(requested, fallback string, interactive bool) (agent.Agent, error) {
+// agentFor resolves an agent id against the built-in agents first, then the
+// custom agents declared in the config file.
+func agentFor(cfg *config.Config, id string) (agent.Agent, error) {
+	builtin, err := agent.Get(id)
+	if err == nil {
+		return builtin, nil
+	}
+	key := strings.ToLower(strings.TrimSpace(id))
+	if custom, ok := cfg.CustomAgents[key]; ok {
+		return agent.FromCustom(key, custom.Name, custom.Command)
+	}
+	return agent.Agent{}, fmt.Errorf("unsupported agent %q (choose: %s)", id, strings.Join(agentIDs(cfg), ", "))
+}
+
+// agentIDs returns built-in and custom agent ids, sorted.
+func agentIDs(cfg *config.Config) []string {
+	ids := agent.IDs()
+	for id := range cfg.CustomAgents {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func resolveAgent(cfg *config.Config, requested string, interactive bool) (agent.Agent, error) {
 	id := requested
 	if id == "" {
-		id = fallback
+		id = cfg.DefaultAgent
 	}
 	if interactive && requested == "" {
-		selected, err := promptAgent(id)
+		selected, err := promptAgent(cfg, id)
 		if err != nil {
 			return agent.Agent{}, err
 		}
 		id = selected
 	}
-	return agent.Get(id)
+	return agentFor(cfg, id)
 }
 
-func promptAgent(defaultID string) (string, error) {
+func promptAgent(cfg *config.Config, defaultID string) (string, error) {
 	if stat, err := os.Stdin.Stat(); err != nil || stat.Mode()&os.ModeCharDevice == 0 {
 		return defaultID, nil
 	}
 
-	fmt.Printf("Select AI agent [%s] (%s): ", strings.Join(agent.IDs(), "/"), defaultID)
+	fmt.Printf("Select AI agent [%s] (%s): ", strings.Join(agentIDs(cfg), "/"), defaultID)
 	reader := bufio.NewReader(os.Stdin)
 	line, err := reader.ReadString('\n')
 	if err != nil && len(line) == 0 {
@@ -105,7 +129,7 @@ func promptAgent(defaultID string) (string, error) {
 	if line == "" {
 		return defaultID, nil
 	}
-	if _, err := agent.Get(line); err != nil {
+	if _, err := agentFor(cfg, line); err != nil {
 		return "", err
 	}
 	return line, nil
@@ -133,7 +157,7 @@ func CreateProject(opts CreateOptions) error {
 		return fmt.Errorf("resolve project path: %w", err)
 	}
 
-	selected, err := resolveAgent(opts.Agent, cfg.DefaultAgent, !opts.AssumeYes)
+	selected, err := resolveAgent(cfg, opts.Agent, !opts.AssumeYes)
 	if err != nil {
 		return err
 	}
@@ -192,7 +216,7 @@ func AddProject(opts AddOptions) error {
 		return fmt.Errorf("project path is not a directory: %s", path)
 	}
 
-	selected, err := resolveAgent(opts.Agent, cfg.DefaultAgent, false)
+	selected, err := resolveAgent(cfg, opts.Agent, false)
 	if err != nil {
 		return err
 	}
@@ -221,7 +245,7 @@ func ImportProjects(opts ImportOptions) error {
 		return fmt.Errorf("read import directory: %w", err)
 	}
 
-	selected, err := resolveAgent(opts.Agent, cfg.DefaultAgent, false)
+	selected, err := resolveAgent(cfg, opts.Agent, false)
 	if err != nil {
 		return err
 	}
@@ -299,7 +323,7 @@ func OpenProject(opts OpenOptions) error {
 	if opts.AgentOverride != "" {
 		agentID = opts.AgentOverride
 	}
-	selected, err := agent.Get(agentID)
+	selected, err := agentFor(cfg, agentID)
 	if err != nil {
 		return err
 	}
@@ -455,11 +479,11 @@ func StopProject(configPath, name string, out io.Writer) error {
 }
 
 func SetAgent(configPath, name, agentID string, out io.Writer) error {
-	selected, err := agent.Get(agentID)
+	cfg, path, err := config.Load(configPath)
 	if err != nil {
 		return err
 	}
-	cfg, path, err := config.Load(configPath)
+	selected, err := agentFor(cfg, agentID)
 	if err != nil {
 		return err
 	}
@@ -516,7 +540,7 @@ func Configure(opts ConfigureOptions) error {
 		changed = true
 	}
 	if opts.DefaultAgent != "" {
-		a, err := agent.Get(opts.DefaultAgent)
+		a, err := agentFor(cfg, opts.DefaultAgent)
 		if err != nil {
 			return err
 		}
@@ -545,12 +569,29 @@ func Doctor(configPath string, out io.Writer) error {
 		commandResult("claude", false),
 		commandResult("codex", false),
 		commandResult("gemini", false),
+		commandResult("opencode", false),
 		commandResult("tailscale", false),
 	}
 
 	cfg, path, cfgErr := config.Load(configPath)
 	results = append(results, doctorResult{name: "config", ok: cfgErr == nil, info: path})
 	if cfgErr == nil {
+		customIDs := make([]string, 0, len(cfg.CustomAgents))
+		for id := range cfg.CustomAgents {
+			customIDs = append(customIDs, id)
+		}
+		sort.Strings(customIDs)
+		for _, id := range customIDs {
+			c := cfg.CustomAgents[id]
+			a, err := agent.FromCustom(id, c.Name, c.Command)
+			if err != nil {
+				results = append(results, doctorResult{name: "custom agent " + id, ok: false, info: err.Error()})
+				continue
+			}
+			r := commandResult(agent.Executable(a), false)
+			r.name = "custom agent " + id
+			results = append(results, r)
+		}
 		info, err := os.Stat(cfg.DefaultProjectsDir)
 		ok := err == nil && info.IsDir()
 		detail := cfg.DefaultProjectsDir
@@ -594,11 +635,4 @@ func commandResult(name string, required bool) doctorResult {
 func isGitRepo(path string) bool {
 	info, err := os.Stat(filepath.Join(path, ".git"))
 	return err == nil && info.IsDir()
-}
-
-// SortedAgents is kept small and explicit for predictable CLI output.
-func SortedAgents() []string {
-	ids := agent.IDs()
-	sort.Strings(ids)
-	return ids
 }

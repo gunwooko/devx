@@ -176,6 +176,68 @@ func TestAddProjectMissingPath(t *testing.T) {
 	}
 }
 
+func TestCustomAgent(t *testing.T) {
+	cfgPath := testConfigPath(t)
+	cfg := mustLoad(t, cfgPath)
+	cfg.CustomAgents = map[string]config.CustomAgent{
+		"aider": {Name: "Aider", Command: "aider --model gpt-4o"},
+	}
+	if err := config.Save(cfgPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	var out bytes.Buffer
+	err := AddProject(AddOptions{
+		ConfigPath: cfgPath,
+		Name:       "demo",
+		Path:       dir,
+		Agent:      "aider",
+		Output:     &out,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg = mustLoad(t, cfgPath)
+	if cfg.Projects["demo"].Agent != "aider" {
+		t.Fatalf("agent = %q, want aider", cfg.Projects["demo"].Agent)
+	}
+	if !strings.Contains(out.String(), "Agent: Aider") {
+		t.Errorf("output missing custom agent name:\n%s", out.String())
+	}
+
+	if err := Configure(ConfigureOptions{ConfigPath: cfgPath, DefaultAgent: "aider", Output: &out}); err != nil {
+		t.Fatalf("custom agent as default: %v", err)
+	}
+
+	err = SetAgent(cfgPath, "demo", "bogus", &out)
+	if err == nil || !strings.Contains(err.Error(), "aider") {
+		t.Fatalf("err = %v, want unsupported-agent error listing custom ids", err)
+	}
+}
+
+func TestCustomAgentInvalidCommand(t *testing.T) {
+	cfgPath := testConfigPath(t)
+	cfg := mustLoad(t, cfgPath)
+	cfg.CustomAgents = map[string]config.CustomAgent{
+		"evil": {Command: "aider; rm -rf /"},
+	}
+	if err := config.Save(cfgPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	err := AddProject(AddOptions{
+		ConfigPath: cfgPath,
+		Name:       "demo",
+		Path:       t.TempDir(),
+		Agent:      "evil",
+		Output:     &bytes.Buffer{},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported characters") {
+		t.Fatalf("err = %v, want command validation error", err)
+	}
+}
+
 func TestImportProjects(t *testing.T) {
 	cfgPath := testConfigPath(t)
 	dir := t.TempDir()
