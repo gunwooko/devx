@@ -127,19 +127,20 @@ devx open novel
 
 ## Commands
 
-```text
-devx <project>
-devx create <name>
-devx add <name> <path>
-devx open <name>
-devx list
-devx status
-devx stop <name>
-devx agent <name> <claude|codex|none>
-devx remove <name>
-devx config
-devx doctor
-```
+| Command | Description |
+|---------|-------------|
+| `devx <project>` | Shorthand for `devx open <project>` |
+| `devx create <name>` | Create a directory, initialize Git, register, and open it |
+| `devx add <name> <path>` | Register an existing directory without touching it |
+| `devx open <name>` | Start or reattach the project's tmux session |
+| `devx list` | List registered projects (name, agent, path) |
+| `devx status` | Like `list`, plus whether each session is running or stopped |
+| `devx stop <name>` | Kill the project's tmux session; the project stays registered |
+| `devx agent <name> <claude\|codex\|none>` | Change the project's default agent |
+| `devx remove <name>` | Unregister a project; files are never deleted |
+| `devx config` | Show or update global defaults |
+| `devx doctor` | Check dependencies and configuration |
+| `devx completion <shell>` | Generate shell completion (bash, zsh, fish, powershell) |
 
 ### Agent override
 
@@ -255,12 +256,10 @@ go build ./...
 
 ## Roadmap
 
-- Shell completion
-- Import projects from directories
 - Per-project environment variables
 - More agents such as Gemini CLI and OpenCode
-- Homebrew tap
-- GitHub Actions release binaries
+- Bulk import of existing project directories
+- Fuzzy matching and interactive selection for `devx open`
 - Optional TUI project picker
 
 ## License
