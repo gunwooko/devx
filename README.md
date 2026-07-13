@@ -29,6 +29,14 @@ When a project is opened, `devx` creates or reconnects to a tmux session. That m
 - JSON configuration under the OS user config directory
 - Dependency and configuration checks with `devx doctor`
 
+## Supported platforms
+
+| Platform | Support |
+|----------|---------|
+| macOS (Apple Silicon, Intel) | Prebuilt binaries and Homebrew |
+| Linux (arm64, amd64) | Prebuilt binaries and Homebrew |
+| Windows | WSL only — `devx` requires tmux, which does not run natively on Windows |
+
 ## Requirements
 
 Required:
