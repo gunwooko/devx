@@ -176,6 +176,103 @@ func TestAddProjectMissingPath(t *testing.T) {
 	}
 }
 
+func TestImportProjects(t *testing.T) {
+	cfgPath := testConfigPath(t)
+	dir := t.TempDir()
+	for _, name := range []string{"alpha", "beta", ".hidden", "bad name"} {
+		if err := os.Mkdir(filepath.Join(dir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := AddProject(AddOptions{
+		ConfigPath: cfgPath,
+		Name:       "alpha",
+		Path:       filepath.Join(dir, "alpha"),
+		Agent:      "codex",
+		Output:     &bytes.Buffer{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	err = ImportProjects(ImportOptions{
+		ConfigPath: cfgPath,
+		Dir:        dir,
+		Agent:      "none",
+		Output:     &out,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := mustLoad(t, cfgPath)
+	if len(cfg.Projects) != 2 {
+		t.Fatalf("projects = %v, want alpha and beta", config.Names(cfg))
+	}
+	if cfg.Projects["beta"].Agent != "none" {
+		t.Fatalf("beta agent = %q, want none", cfg.Projects["beta"].Agent)
+	}
+	if cfg.Projects["alpha"].Agent != "codex" {
+		t.Fatalf("alpha agent = %q, want codex (existing registration untouched)", cfg.Projects["alpha"].Agent)
+	}
+	for _, want := range []string{
+		"Imported beta",
+		"Skipped alpha: name already registered",
+		"Skipped bad name: invalid project name",
+		"Imported 1 project(s)",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output missing %q:\n%s", want, out.String())
+		}
+	}
+	if strings.Contains(out.String(), ".hidden") {
+		t.Errorf("hidden directory should be ignored silently:\n%s", out.String())
+	}
+}
+
+func TestImportProjectsDryRun(t *testing.T) {
+	cfgPath := testConfigPath(t)
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "alpha"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	err := ImportProjects(ImportOptions{
+		ConfigPath: cfgPath,
+		Dir:        dir,
+		Agent:      "none",
+		DryRun:     true,
+		Output:     &out,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := mustLoad(t, cfgPath)
+	if len(cfg.Projects) != 0 {
+		t.Fatalf("dry run saved projects: %v", config.Names(cfg))
+	}
+	if !strings.Contains(out.String(), "Would import alpha") {
+		t.Errorf("output missing dry-run line:\n%s", out.String())
+	}
+}
+
+func TestImportProjectsMissingDir(t *testing.T) {
+	err := ImportProjects(ImportOptions{
+		ConfigPath: testConfigPath(t),
+		Dir:        filepath.Join(t.TempDir(), "missing"),
+		Agent:      "none",
+		Output:     &bytes.Buffer{},
+	})
+	if err == nil {
+		t.Fatal("expected error for nonexistent directory")
+	}
+}
+
 func TestOpenProjectUnregistered(t *testing.T) {
 	err := OpenProject(OpenOptions{ConfigPath: testConfigPath(t), Name: "ghost", Output: &bytes.Buffer{}})
 	if err == nil || !strings.Contains(err.Error(), "not registered") {

@@ -11,6 +11,14 @@ func TestGet(t *testing.T) {
 		t.Fatalf("command = %q", a.Command)
 	}
 
+	g, err := Get("gemini")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Command != "gemini" {
+		t.Fatalf("command = %q", g.Command)
+	}
+
 	if _, err := Get("unknown"); err == nil {
 		t.Fatal("expected unsupported agent error")
 	}

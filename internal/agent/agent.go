@@ -16,6 +16,7 @@ type Agent struct {
 var supported = map[string]Agent{
 	"claude": {ID: "claude", Name: "Claude Code", Command: "claude"},
 	"codex":  {ID: "codex", Name: "Codex CLI", Command: "codex"},
+	"gemini": {ID: "gemini", Name: "Gemini CLI", Command: "gemini"},
 	"none":   {ID: "none", Name: "Shell only", Command: ""},
 }
 

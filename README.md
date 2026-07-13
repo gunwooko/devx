@@ -6,6 +6,7 @@ It supports project-level defaults for:
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - [Codex CLI](https://github.com/openai/codex)
+- [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 - Shell-only sessions
 
 The main workflow is:
@@ -20,8 +21,8 @@ When a project is opened, `devx` creates or reconnects to a tmux session. That m
 ## Features
 
 - Create and Git-initialize new projects
-- Register existing projects
-- Choose Claude Code, Codex, or shell-only per project
+- Register existing projects, one at a time or in bulk with `devx import`
+- Choose Claude Code, Codex, Gemini, or shell-only per project
 - Override the AI agent for a new session
 - Create, attach, switch, inspect, and stop tmux sessions
 - Fuzzy project name matching on open (`devx nls` finds `novel-love-story`)
@@ -49,6 +50,7 @@ Optional:
 
 - Claude Code (`claude`)
 - Codex CLI (`codex`)
+- Gemini CLI (`gemini`)
 - Tailscale for secure remote access
 
 ## Install with Homebrew
@@ -122,6 +124,12 @@ Register an existing project:
 devx add novel ~/Projects/personal/novel --agent claude
 ```
 
+Register every subdirectory of a directory at once (use `--dry-run` to preview):
+
+```bash
+devx import ~/Projects/personal --agent claude
+```
+
 Open it:
 
 ```bash
@@ -141,11 +149,12 @@ devx open novel
 | `devx <project>` | Shorthand for `devx open <project>` |
 | `devx create <name>` | Create a directory, initialize Git, register, and open it |
 | `devx add <name> <path>` | Register an existing directory without touching it |
+| `devx import <dir>` | Register every subdirectory as a project; `--dry-run` previews |
 | `devx open <name>` | Start or reattach the project's tmux session; the name is fuzzy-matched |
 | `devx list` | List registered projects (name, agent, path) |
 | `devx status` | Like `list`, plus whether each session is running or stopped |
 | `devx stop <name>` | Kill the project's tmux session; the project stays registered |
-| `devx agent <name> <claude\|codex\|none>` | Change the project's default agent |
+| `devx agent <name> <claude\|codex\|gemini\|none>` | Change the project's default agent |
 | `devx remove <name>` | Unregister a project; files are never deleted |
 | `devx config` | Show or update global defaults |
 | `devx doctor` | Check dependencies and configuration |
@@ -266,8 +275,7 @@ go build ./...
 ## Roadmap
 
 - Per-project environment variables
-- More agents such as Gemini CLI and OpenCode
-- Bulk import of existing project directories
+- More agents such as OpenCode
 - Optional TUI project picker
 
 ## License

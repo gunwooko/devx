@@ -23,6 +23,6 @@ var addCmd = &cobra.Command{
 }
 
 func init() {
-	addCmd.Flags().StringVarP(&addAgent, "agent", "a", "", "AI agent: claude, codex, or none")
+	addCmd.Flags().StringVarP(&addAgent, "agent", "a", "", "AI agent: claude, codex, gemini, or none")
 	rootCmd.AddCommand(addCmd)
 }

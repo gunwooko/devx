@@ -39,6 +39,14 @@ type AddOptions struct {
 	Output     io.Writer
 }
 
+type ImportOptions struct {
+	ConfigPath string
+	Dir        string
+	Agent      string
+	DryRun     bool
+	Output     io.Writer
+}
+
 type OpenOptions struct {
 	ConfigPath    string
 	Name          string
@@ -87,7 +95,7 @@ func promptAgent(defaultID string) (string, error) {
 		return defaultID, nil
 	}
 
-	fmt.Printf("Select AI agent [claude/codex/none] (%s): ", defaultID)
+	fmt.Printf("Select AI agent [%s] (%s): ", strings.Join(agent.IDs(), "/"), defaultID)
 	reader := bufio.NewReader(os.Stdin)
 	line, err := reader.ReadString('\n')
 	if err != nil && len(line) == 0 {
@@ -193,6 +201,75 @@ func AddProject(opts AddOptions) error {
 		return err
 	}
 	fmt.Fprintf(output(opts.Output), "Added %s\nPath: %s\nAgent: %s\n", opts.Name, path, selected.Name)
+	return nil
+}
+
+// ImportProjects registers every immediate subdirectory of opts.Dir as a
+// project. Hidden directories, invalid names, and names or paths that are
+// already registered are skipped with a note.
+func ImportProjects(opts ImportOptions) error {
+	cfg, cfgPath, err := config.Load(opts.ConfigPath)
+	if err != nil {
+		return err
+	}
+	dir, err := config.ExpandPath(opts.Dir)
+	if err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("read import directory: %w", err)
+	}
+
+	selected, err := resolveAgent(opts.Agent, cfg.DefaultAgent, false)
+	if err != nil {
+		return err
+	}
+
+	registeredPaths := make(map[string]string, len(cfg.Projects))
+	for name, p := range cfg.Projects {
+		registeredPaths[p.Path] = name
+	}
+
+	out := output(opts.Output)
+	imported := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() || strings.HasPrefix(name, ".") {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		if err := validateName(name); err != nil {
+			fmt.Fprintf(out, "Skipped %s: invalid project name\n", name)
+			continue
+		}
+		if _, exists := cfg.Projects[name]; exists {
+			fmt.Fprintf(out, "Skipped %s: name already registered\n", name)
+			continue
+		}
+		if existing, ok := registeredPaths[path]; ok {
+			fmt.Fprintf(out, "Skipped %s: path already registered as %q\n", name, existing)
+			continue
+		}
+		if opts.DryRun {
+			fmt.Fprintf(out, "Would import %s (%s)\n", name, path)
+		} else {
+			cfg.Projects[name] = config.Project{Path: path, Agent: selected.ID}
+			fmt.Fprintf(out, "Imported %s (%s)\n", name, path)
+		}
+		imported++
+	}
+
+	if opts.DryRun {
+		fmt.Fprintf(out, "Dry run: %d project(s) would be imported with agent %s\n", imported, selected.Name)
+		return nil
+	}
+	if imported > 0 {
+		if err := config.Save(cfgPath, cfg); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(out, "Imported %d project(s) with agent %s\n", imported, selected.Name)
 	return nil
 }
 
@@ -467,6 +544,7 @@ func Doctor(configPath string, out io.Writer) error {
 		commandResult("tmux", true),
 		commandResult("claude", false),
 		commandResult("codex", false),
+		commandResult("gemini", false),
 		commandResult("tailscale", false),
 	}
 
