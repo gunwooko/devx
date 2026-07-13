@@ -183,6 +183,80 @@ func TestOpenProjectUnregistered(t *testing.T) {
 	}
 }
 
+func TestMatchProjects(t *testing.T) {
+	names := []string{"novel-love-story", "my-app", "app-server", "raon"}
+	cases := []struct {
+		input string
+		want  []string
+	}{
+		{"novel", []string{"novel-love-story"}},  // prefix
+		{"NOVEL", []string{"novel-love-story"}},  // case-insensitive
+		{"app", []string{"app-server"}},          // prefix tier beats substring ("my-app")
+		{"pp", []string{"app-server", "my-app"}}, // substring, sorted
+		{"nls", []string{"novel-love-story"}},    // subsequence
+		{"raon", []string{"raon"}},               // exact is also a prefix
+		{"zzz", nil},                             // no match
+		{"", nil},                                // empty input matches nothing useful
+	}
+	for _, c := range cases {
+		got := matchProjects(names, c.input)
+		if len(got) != len(c.want) {
+			t.Errorf("matchProjects(%q) = %v, want %v", c.input, got, c.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != c.want[i] {
+				t.Errorf("matchProjects(%q) = %v, want %v", c.input, got, c.want)
+				break
+			}
+		}
+	}
+}
+
+func TestIsSubsequence(t *testing.T) {
+	if !isSubsequence("nls", "novel-love-story") {
+		t.Error("nls should be a subsequence of novel-love-story")
+	}
+	if isSubsequence("nsl", "novel-love-story") {
+		t.Error("nsl is out of order and must not match")
+	}
+	if isSubsequence("", "anything") {
+		t.Error("empty needle must not match")
+	}
+}
+
+func TestResolveProject(t *testing.T) {
+	cfg := &config.Config{Projects: map[string]config.Project{
+		"novel-love-story": {},
+		"my-app":           {},
+		"app-server":       {},
+	}}
+
+	name, err := resolveProject(cfg, "novel")
+	if err != nil || name != "novel-love-story" {
+		t.Fatalf("resolveProject(novel) = %q, %v", name, err)
+	}
+
+	if _, err := resolveProject(cfg, "zzz"); err == nil || !strings.Contains(err.Error(), "not registered") {
+		t.Fatalf("err = %v, want not-registered error", err)
+	}
+
+	// Ambiguous input without a terminal reports the candidates.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	defer w.Close()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	if _, err := resolveProject(cfg, "pp"); err == nil || !strings.Contains(err.Error(), "matches multiple projects") {
+		t.Fatalf("err = %v, want ambiguous-match error", err)
+	}
+}
+
 func TestSetAgent(t *testing.T) {
 	cfgPath := testConfigPath(t)
 	dir := t.TempDir()

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -200,9 +201,15 @@ func OpenProject(opts OpenOptions) error {
 	if err != nil {
 		return err
 	}
-	project, ok := cfg.Projects[opts.Name]
+	name := opts.Name
+	project, ok := cfg.Projects[name]
 	if !ok {
-		return fmt.Errorf("project %q is not registered; run `devx list` or `devx add`", opts.Name)
+		name, err = resolveProject(cfg, opts.Name)
+		if err != nil {
+			return err
+		}
+		project = cfg.Projects[name]
+		fmt.Fprintf(output(opts.Output), "Opening %s\n", name)
 	}
 	if _, err := os.Stat(project.Path); err != nil {
 		return fmt.Errorf("project path is unavailable: %w", err)
@@ -220,7 +227,7 @@ func OpenProject(opts OpenOptions) error {
 		return err
 	}
 
-	session := tmux.SessionName(opts.Name)
+	session := tmux.SessionName(name)
 	if !tmux.Exists(session) {
 		if !agent.Installed(selected) {
 			return fmt.Errorf("%s command %q was not found in PATH", selected.Name, selected.Command)
@@ -232,9 +239,90 @@ func OpenProject(opts OpenOptions) error {
 		if err := tmux.CreateDetached(session, project.Path, command); err != nil {
 			return err
 		}
-		fmt.Fprintf(output(opts.Output), "Started %s with %s\n", opts.Name, selected.Name)
+		fmt.Fprintf(output(opts.Output), "Started %s with %s\n", name, selected.Name)
 	}
 	return tmux.AttachOrSwitch(session)
+}
+
+// resolveProject fuzzily matches input against registered project names.
+// A unique candidate is used directly; multiple candidates prompt for a
+// choice on a terminal and fail otherwise.
+func resolveProject(cfg *config.Config, input string) (string, error) {
+	candidates := matchProjects(config.Names(cfg), input)
+	switch len(candidates) {
+	case 0:
+		return "", fmt.Errorf("project %q is not registered; run `devx list` or `devx add`", input)
+	case 1:
+		return candidates[0], nil
+	}
+	return promptProject(input, candidates)
+}
+
+// matchProjects returns the best non-empty tier of matches for input:
+// case-insensitive prefix, then substring, then in-order subsequence
+// (e.g. "nls" matches "novel-love-story").
+func matchProjects(names []string, input string) []string {
+	in := strings.ToLower(input)
+	if in == "" {
+		return nil
+	}
+	var prefix, substr, subseq []string
+	for _, name := range names {
+		n := strings.ToLower(name)
+		switch {
+		case strings.HasPrefix(n, in):
+			prefix = append(prefix, name)
+		case strings.Contains(n, in):
+			substr = append(substr, name)
+		case isSubsequence(in, n):
+			subseq = append(subseq, name)
+		}
+	}
+	for _, tier := range [][]string{prefix, substr, subseq} {
+		if len(tier) > 0 {
+			sort.Strings(tier)
+			return tier
+		}
+	}
+	return nil
+}
+
+func isSubsequence(needle, haystack string) bool {
+	if needle == "" {
+		return false
+	}
+	i := 0
+	for _, r := range haystack {
+		if i < len(needle) && rune(needle[i]) == r {
+			i++
+		}
+	}
+	return i == len(needle)
+}
+
+func promptProject(input string, candidates []string) (string, error) {
+	if stat, err := os.Stdin.Stat(); err != nil || stat.Mode()&os.ModeCharDevice == 0 {
+		return "", fmt.Errorf("%q matches multiple projects: %s", input, strings.Join(candidates, ", "))
+	}
+	fmt.Printf("%q matches multiple projects:\n", input)
+	for i, name := range candidates {
+		fmt.Printf("  %d) %s\n", i+1, name)
+	}
+	fmt.Print("Select [1]: ")
+	reader := bufio.NewReader(os.Stdin)
+	line, err := reader.ReadString('\n')
+	if err != nil && len(line) == 0 {
+		return "", fmt.Errorf("%q matches multiple projects: %s", input, strings.Join(candidates, ", "))
+	}
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return candidates[0], nil
+	}
+	idx, err := strconv.Atoi(line)
+	if err != nil || idx < 1 || idx > len(candidates) {
+		return "", fmt.Errorf("invalid selection %q", line)
+	}
+	return candidates[idx-1], nil
 }
 
 func ListProjects(configPath string, out io.Writer) error {

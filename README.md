@@ -24,6 +24,7 @@ When a project is opened, `devx` creates or reconnects to a tmux session. That m
 - Choose Claude Code, Codex, or shell-only per project
 - Override the AI agent for a new session
 - Create, attach, switch, inspect, and stop tmux sessions
+- Fuzzy project name matching on open (`devx nls` finds `novel-love-story`)
 - Safe behavior when invoked from inside tmux
 - JSON configuration under the OS user config directory
 - Dependency and configuration checks with `devx doctor`
@@ -132,7 +133,7 @@ devx open novel
 | `devx <project>` | Shorthand for `devx open <project>` |
 | `devx create <name>` | Create a directory, initialize Git, register, and open it |
 | `devx add <name> <path>` | Register an existing directory without touching it |
-| `devx open <name>` | Start or reattach the project's tmux session |
+| `devx open <name>` | Start or reattach the project's tmux session; the name is fuzzy-matched |
 | `devx list` | List registered projects (name, agent, path) |
 | `devx status` | Like `list`, plus whether each session is running or stopped |
 | `devx stop <name>` | Kill the project's tmux session; the project stays registered |
@@ -259,7 +260,6 @@ go build ./...
 - Per-project environment variables
 - More agents such as Gemini CLI and OpenCode
 - Bulk import of existing project directories
-- Fuzzy matching and interactive selection for `devx open`
 - Optional TUI project picker
 
 ## License
