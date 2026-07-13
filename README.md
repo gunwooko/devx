@@ -274,7 +274,6 @@ go build ./...
 
 ## Roadmap
 
-- Per-project environment variables
 - More agents such as OpenCode
 - Optional TUI project picker
 
